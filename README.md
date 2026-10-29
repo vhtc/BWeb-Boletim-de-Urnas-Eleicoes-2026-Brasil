@@ -10,11 +10,21 @@ A ferramenta permite analisar os dados dos boletins de urna por estado, facilita
 
 - **Leitura de arquivos CSV:** consulta os dados dos boletins de urna diretamente dos arquivos disponíveis na pasta configurada.
 - **Suporte a arquivos ZIP:** identifica e lê arquivos CSV compactados, sem modificar os arquivos originais.
-- **Seleção por estado:** prepara em cache temporário do Windows apenas os dados do estado selecionado.
+- **Filtros de navegação:** permite selecionar região, estado, município, cargo, candidato/opção, zona e seção.
+- **Filtros de participação:** permite restringir o horário de encerramento e as seções com eleitores sem habilitação biométrica.
 - **Consultas eficientes:** utiliza o DuckDB para consultar os arquivos sem precisar importar toda a base para o Excel.
-- **Visualização tabular:** exibe até 500 registros por vez, facilitando a navegação pelos dados.
+- **Painel analítico:** apresenta métricas de seções, eleitores aptos (ou sem habilitação biométrica), comparecimento e abstenções.
+- **Gráficos interativos:** compara as 12 opções de voto mais votadas e mostra a proporção entre comparecimento e abstenções.
+- **Tabelas de consulta:** exibe as opções de voto e uma prévia de até 500 registros do boletim.
+- **Cache temporário:** prepara os arquivos selecionados para consulta local, preservando os arquivos originais.
 - **Validação dos arquivos:** ignora arquivos ZIP que não contenham CSV e apresenta avisos sobre esses casos.
 - **Configuração da pasta de dados:** permite utilizar a pasta padrão ou informar outro diretório com os arquivos eleitorais.
+
+## Interface
+
+O visualizador abre diretamente em um painel responsivo. A barra lateral concentra os filtros e o caminho da pasta de dados; no painel principal, os indicadores resumem as seções selecionadas, enquanto os gráficos mostram a distribuição de votos e a participação eleitoral. Abaixo deles ficam a tabela de opções de voto e a prévia dos registros do boletim.
+
+O gráfico de votos destaca as 12 opções mais votadas, mas a tabela de opções apresenta todos os resultados encontrados para os filtros aplicados. A prévia de registros é limitada a 500 linhas; os totais do painel consideram os registros abrangidos pela consulta, não apenas as linhas exibidas na prévia.
 
 ## Tecnologias utilizadas
 
@@ -29,7 +39,7 @@ Antes de executar a aplicação, verifique se o ambiente possui:
 
 - Windows;
 - Python instalado e disponível no terminal;
-- Arquivo `requirements.txt` na pasta do projeto;
+- Arquivo `visualizador_bu/requirements.txt`;
 - Arquivos CSV ou ZIP contendo os boletins de urna.
 
 ## Instalação e execução no Windows
@@ -39,10 +49,10 @@ Antes de executar a aplicação, verifique se o ambiente possui:
 Abra o PowerShell ou outro terminal e navegue até o diretório da aplicação.
 
 ```powershell
-cd "C:\caminho\para\VisualizadorBU"
+cd "C:\caminho\para\BWeb\visualizador_bu"
 ```
 
-Substitua o caminho pelo diretório em que o projeto está salvo.
+Substitua `C:\caminho\para\BWeb` pelo diretório em que o projeto está salvo.
 
 ### 2. Crie o ambiente virtual
 
@@ -74,13 +84,12 @@ Após a inicialização, o Streamlit exibirá o endereço local da aplicação n
 
 ## Configuração dos arquivos de dados
 
-Por padrão, a aplicação procura os arquivos na pasta:
+Por padrão, a aplicação procura os arquivos na pasta `Boletim_Urna_CSV`, na raiz do projeto. O caminho aparece no campo **Pasta com arquivos CSV** e pode ser alterado pela interface.
 
 ```text
-../Boletim_Urna_CSV
+BWeb/
+└── Boletim_Urna_CSV/
 ```
-
-Essa pasta é relativa ao diretório de execução da aplicação.
 
 Para disponibilizar os dados, coloque os arquivos `.csv` ou `.zip` nesse diretório. Se os arquivos estiverem em outro local, informe o caminho desejado no campo **Pasta com arquivos CSV**, disponível na interface.
 
@@ -95,9 +104,9 @@ O leitor foi configurado para trabalhar com arquivos CSV que apresentam as segui
 | Codificação | Latin-1 |
 | Consulta dos dados | DuckDB |
 | Limite de exibição | 500 registros por vez |
-| Preparação temporária | Cache local do Windows para o estado selecionado |
+| Preparação temporária | Cache local do Windows para os arquivos selecionados |
 
-**Importante:** o arquivo ZIP original não é alterado. O cache temporário é utilizado para preparar os dados do estado selecionado, evitando o processamento desnecessário dos demais estados.
+**Importante:** os arquivos ZIP originais não são alterados. O cache temporário prepara os CSVs dos estados selecionados para consulta.
 
 Arquivos ZIP que não contenham arquivos CSV são ignorados e relacionados nos avisos apresentados pela aplicação.
 
@@ -121,14 +130,16 @@ A disponibilidade, a estrutura e a codificação dos arquivos podem variar confo
 ## Estrutura esperada do projeto
 
 ```text
-VisualizadorBU/
-├── app.py
-├── requirements.txt
+BWeb/
+├── Boletim_Urna_CSV/       # Arquivos CSV ou ZIP com os boletins
 ├── README.md
-└── .venv/                 # Ambiente virtual local
+└── visualizador_bu/
+	├── app.py
+	├── requirements.txt
+	└── .venv/              # Ambiente virtual local (opcional)
 ```
 
-A pasta de dados pode ficar fora do diretório do projeto, conforme a configuração padrão ou o caminho informado na interface.
+A pasta de dados pode ficar em outro local; nesse caso, informe o caminho na interface.
 
 ## Licença e responsabilidade
 

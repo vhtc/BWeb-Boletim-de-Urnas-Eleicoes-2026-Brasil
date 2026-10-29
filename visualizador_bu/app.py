@@ -7,10 +7,67 @@ from pathlib import Path
 
 import duckdb
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 
 st.set_page_config(page_title="Boletim de Urna", page_icon="BU", layout="wide")
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
+
+    :root {
+        --ink: #172a25;
+        --muted: #64746d;
+        --paper: #f3f6f1;
+        --surface: #ffffff;
+        --line: #dce5dc;
+        --green: #147d5a;
+        --mint: #d9eee2;
+        --coral: #d96f58;
+        --gold: #d9a83e;
+    }
+    html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; color: var(--ink); }
+    [data-testid="stAppViewContainer"] { background: var(--paper); }
+    [data-testid="stHeader"] { background: transparent; }
+    [data-testid="stSidebar"] { background: #e8efe8; border-right: 1px solid var(--line); }
+    [data-testid="stSidebar"] > div:first-child { padding-top: 1.4rem; }
+    [data-testid="stMainBlockContainer"] { padding: 2rem 2.4rem 3rem; max-width: 1600px; }
+    h1, h2, h3 { font-family: 'Manrope', sans-serif !important; color: var(--ink) !important; }
+    .dashboard-header {
+        display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;
+        padding: 1rem 0 1.5rem; border-bottom: 1px solid var(--line); margin-bottom: 1.35rem;
+    }
+    .dashboard-header h1 { font-size: 2.25rem; line-height: 1.1; margin: .2rem 0 .45rem; }
+    .dashboard-header p { color: var(--muted); margin: 0; }
+    .eyebrow { color: var(--green) !important; font-size: .72rem; font-weight: 700; letter-spacing: .08em; }
+    .local-badge {
+        display: inline-flex; align-items: center; gap: .5rem; background: var(--mint); color: #15583f;
+        border: 1px solid #b7dbc6; border-radius: 999px; padding: .45rem .75rem; font-size: .75rem;
+        font-weight: 700; white-space: nowrap; margin-top: .35rem;
+    }
+    .local-badge span { width: .48rem; height: .48rem; background: var(--green); border-radius: 50%; }
+    [data-testid="stMetric"] {
+        background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--green);
+        border-radius: 8px; padding: 1rem 1.1rem; min-height: 112px;
+    }
+    [data-testid="stMetricLabel"] { color: var(--muted); font-weight: 600; }
+    [data-testid="stMetricValue"] { font-family: 'Manrope', sans-serif; color: var(--ink); }
+    [data-testid="stMetricDelta"] { font-size: .78rem; }
+    [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p { font-weight: 600; color: var(--ink); }
+    [data-testid="stDataFrame"] { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    div[data-testid="stPlotlyChart"] { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: .45rem; }
+    @media (max-width: 760px) {
+        [data-testid="stMainBlockContainer"] { padding: 1.15rem 1rem 2rem; }
+        .dashboard-header { flex-direction: column; }
+        .dashboard-header h1 { font-size: 1.8rem; }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 DEFAULT_DATA_DIR = Path(__file__).resolve().parents[1] / "Boletim_Urna_CSV"
 SOURCE = "read_csv(?, delim=';', header=true, all_varchar=true, union_by_name=true, encoding='latin-1')"
@@ -198,8 +255,19 @@ def make_filters(
     return tuple(filters)
 
 
-st.title("Boletim de Urna")
-st.caption("Consulta local dos arquivos CSV, sem abrir a base inteira em uma planilha.")
+st.markdown(
+        """
+        <div class="dashboard-header">
+            <div>
+                <p class="eyebrow">PAINEL DE DADOS ELEITORAIS</p>
+                <h1>Boletim de Urna</h1>
+                <p>Explore participação, votos e registros por localidade.</p>
+            </div>
+            <div class="local-badge"><span></span> PROCESSAMENTO LOCAL</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+)
 
 with st.sidebar:
     st.header("Dados")
@@ -278,7 +346,7 @@ biometric_section_filter = st.sidebar.selectbox(
     "Contagem de eleitores",
     [
         "Todos os eleitores aptos",
-        "QT_ELEI_BIOM_SEM_HABILITACAO",
+        "Todos os eleitores com falha de biometria",
     ],
     key="biometric_section_filter_v1",
 )
@@ -320,7 +388,14 @@ voter_count_label = (
 metric_columns = st.columns(4)
 metric_columns[0].metric("Seções", f"{int(metrics['secoes']):,}".replace(",", "."))
 metric_columns[1].metric(voter_count_label, f"{int(voter_count):,}".replace(",", "."))
-metric_columns[2].metric("Comparecimento", f"{int(metrics['comparecimento']):,}".replace(",", "."))
+attendance = int(metrics["comparecimento"])
+absences = int(metrics["abstencoes"])
+attendance_rate = attendance / (attendance + absences) * 100 if attendance + absences else 0
+metric_columns[2].metric(
+    "Comparecimento",
+    f"{attendance:,}".replace(",", "."),
+    f"{attendance_rate:.1f}% do total".replace(".", ","),
+)
 metric_columns[3].metric("Abstenções", f"{int(metrics['abstencoes']):,}".replace(",", "."))
 st.caption(
     "A habilitação biométrica é contabilizada por seção. O cargo selecionado restringe os registros; "
@@ -344,8 +419,8 @@ votes = run_query(
     vote_params,
 )
 
-left, right = st.columns([1, 1])
-with left:
+chart_left, chart_right = st.columns([1.5, 1], gap="large")
+with chart_left:
     st.subheader("Votos por candidato ou opção")
     if biometric_sections_only:
         st.caption(
@@ -355,16 +430,68 @@ with left:
     if votes.empty:
         st.info("Nenhum resultado para os filtros selecionados.")
     else:
-        st.bar_chart(votes.set_index("candidato")["votos"])
-        st.dataframe(votes, hide_index=True, use_container_width=True)
+        chart_votes = votes.head(12).sort_values("votos", ascending=True)
+        vote_figure = px.bar(
+            chart_votes,
+            x="votos",
+            y="candidato",
+            orientation="h",
+            color="votos",
+            color_continuous_scale=["#b8ddc8", "#147d5a"],
+            labels={"votos": "Votos", "candidato": "Candidato / opção"},
+            text_auto=".2s",
+        )
+        vote_figure.update_layout(
+            height=max(330, 42 * len(chart_votes) + 100),
+            margin=dict(l=8, r=18, t=18, b=24),
+            font=dict(family="DM Sans, sans-serif", color="#172a25"),
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            coloraxis_showscale=False,
+            xaxis=dict(showgrid=True, gridcolor="#e8eee8", zeroline=False, title=None),
+            yaxis=dict(showgrid=False, title=None),
+        )
+        vote_figure.update_traces(textposition="outside", cliponaxis=False, hovertemplate="%{y}<br>%{x:,} votos<extra></extra>")
+        st.plotly_chart(vote_figure, use_container_width=True, config={"displayModeBar": False})
+        if len(votes) > len(chart_votes):
+            st.caption(f"Gráfico com as 12 opções mais votadas; tabela completa abaixo ({len(votes)} opções).")
 
-with right:
-    st.subheader("Registros do boletim")
-    preview = run_query(
-        files,
-        signature,
-        f"SELECT * FROM {SOURCE} {vote_where} LIMIT {PREVIEW_LIMIT}",
-        vote_params,
-    )
-    st.dataframe(preview, hide_index=True, use_container_width=True, height=440)
-    st.caption(f"Exibindo até {PREVIEW_LIMIT} registros; os totais acima consideram todos os registros filtrados.")
+with chart_right:
+    st.subheader("Participação eleitoral")
+    if attendance + absences:
+        participation_figure = go.Figure(
+            go.Pie(
+                labels=["Comparecimento", "Abstenções"],
+                values=[attendance, absences],
+                hole=0.76,
+                sort=False,
+                marker=dict(colors=["#147d5a", "#e6b84f"], line=dict(color="#ffffff", width=3)),
+                textinfo="none",
+                hovertemplate="%{label}<br>%{value:,} eleitores (%{percent})<extra></extra>",
+            )
+        )
+        participation_figure.update_layout(
+            height=390,
+            margin=dict(l=12, r=12, t=18, b=18),
+            showlegend=True,
+            legend=dict(orientation="h", y=-0.08, x=0.5, xanchor="center"),
+            font=dict(family="DM Sans, sans-serif", color="#172a25"),
+            paper_bgcolor="rgba(0,0,0,0)",
+            annotations=[dict(text=f"{attendance_rate:.1f}%".replace(".", ","), x=0.5, y=0.52, showarrow=False, font=dict(size=27, family="Manrope", color="#172a25"))],
+        )
+        st.plotly_chart(participation_figure, use_container_width=True, config={"displayModeBar": False})
+    else:
+        st.info("Sem dados de participação para os filtros selecionados.")
+
+st.subheader("Opções de voto")
+st.dataframe(votes, hide_index=True, use_container_width=True, height=280)
+
+st.subheader("Registros do boletim")
+preview = run_query(
+    files,
+    signature,
+    f"SELECT * FROM {SOURCE} {vote_where} LIMIT {PREVIEW_LIMIT}",
+    vote_params,
+)
+st.dataframe(preview, hide_index=True, use_container_width=True, height=440)
+st.caption(f"Exibindo até {PREVIEW_LIMIT} registros; os totais acima consideram todos os registros filtrados.")
